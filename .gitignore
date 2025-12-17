@@ -1,0 +1,15 @@
+# Ignore datasets
+*.csv
+*.pkl
+*.parquet
+
+# Ignore model files
+*.txt
+
+# Ignore outputs
+submission.csv
+processed_dataset.pkl
+
+# Jupyter & Python
+.ipynb_checkpoints/
+__pycache__/
