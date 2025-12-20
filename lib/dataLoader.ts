@@ -1,249 +1,205 @@
 import Papa from 'papaparse';
-import { ItemMaster, Forecast, HistoricalSale, CalendarEntry, SalesDataPoint } from './types';
+import { ItemMaster, Forecast, CalendarEntry, SalesDataPoint } from './types';
 
-// Cache for loaded data
+/* =======================
+   CACHE
+======================= */
 let itemMasterCache: ItemMaster[] | null = null;
 let forecastCache: Forecast[] | null = null;
 let calendarCache: CalendarEntry[] | null = null;
-let salesCache: Map<string, HistoricalSale[]> = new Map();
-let salesWideFormatCache: any[] | null = null; // Cache the entire wide format sales file
 
-/**
- * Load CSV file and parse it
- */
-async function loadCSV<T>(filePath: string): Promise<T[]> {
-  const response = await fetch(filePath);
-  const text = await response.text();
-  
+let historical90DaysCache:
+  | Array<{ id: string; date: string; sales: number }>
+  | null = null;
+
+let historicalMonthlyCache:
+  | Array<{ id: string; year: number; month: number; sales: number }>
+  | null = null;
+
+/* =======================
+   CSV LOADER
+======================= */
+async function loadCSV<T>(path: string): Promise<T[]> {
+  const res = await fetch(path, { cache: 'no-store' });
+  const text = await res.text();
+
   return new Promise((resolve, reject) => {
     Papa.parse<T>(text, {
       header: true,
       skipEmptyLines: true,
-      complete: (results) => {
-        resolve(results.data);
-      },
-      error: (error) => {
-        reject(error);
-      },
+      dynamicTyping: true,
+      complete: (r) => resolve(r.data),
+      error: reject,
     });
   });
 }
 
-/**
- * Load item master data (cached)
- */
+/* =======================
+   MASTER DATA
+======================= */
 export async function loadItemMaster(): Promise<ItemMaster[]> {
-  if (itemMasterCache) {
-    return itemMasterCache;
-  }
-  
-  const data = await loadCSV<ItemMaster>('/item_master.csv');
-  itemMasterCache = data;
-  return data;
+  if (itemMasterCache) return itemMasterCache;
+  itemMasterCache = await loadCSV<ItemMaster>('/item_master.csv');
+  return itemMasterCache;
 }
 
-/**
- * Load forecast data (cached)
- */
 export async function loadForecasts(): Promise<Forecast[]> {
-  if (forecastCache) {
-    return forecastCache;
-  }
-  
-  const data = await loadCSV<Forecast>('/submission.csv');
-  forecastCache = data;
-  return data;
+  if (forecastCache) return forecastCache;
+  forecastCache = await loadCSV<Forecast>('/submission.csv');
+  return forecastCache;
 }
 
-/**
- * Load calendar data (cached)
- */
 export async function loadCalendar(): Promise<CalendarEntry[]> {
-  if (calendarCache) {
-    return calendarCache;
-  }
-  
-  const data = await loadCSV<{ date: string; d: string; year: string; month: string }>('/calendar.csv');
-  // Convert year and month to numbers
-  calendarCache = data.map(entry => ({
-    date: entry.date,
-    d: entry.d,
-    year: parseInt(entry.year) || undefined,
-    month: parseInt(entry.month) || undefined,
+  if (calendarCache) return calendarCache;
+
+  const raw = await loadCSV<any>('/calendar.csv');
+  calendarCache = raw.map((r) => ({
+    date: r.date,
+    d: r.d,
+    year: Number(r.year),
+    month: Number(r.month),
   }));
+
   return calendarCache;
 }
 
-/**
- * Load historical sales data for a specific item
- * This loads from sales_train_evaluation.csv and transforms wide format to long format
- */
-export async function loadHistoricalSalesForItem(itemId: string): Promise<HistoricalSale[]> {
-  // Check cache first
-  if (salesCache.has(itemId)) {
-    return salesCache.get(itemId)!;
-  }
+/* =======================
+   PRE-AGGREGATED DATA
+======================= */
+export async function loadHistorical90Days() {
+  if (historical90DaysCache) return historical90DaysCache;
 
-  // Load sales data (wide format) - use cache if available
-  if (!salesWideFormatCache) {
-    salesWideFormatCache = await loadCSV<any>('/sales_train_evaluation.csv');
-  }
-  const salesData = salesWideFormatCache;
-  
-  // Find the row for this item
-  const itemRow = salesData.find((row: any) => row.id === itemId || row.id?.includes(itemId));
-  
-  if (!itemRow) {
-    return [];
-  }
+  historical90DaysCache = await loadCSV<{
+    id: string;
+    date: string;
+    sales: number;
+  }>('/historical_90_days.csv');
 
-  // Load calendar to map d_ columns to dates
-  const calendar = await loadCalendar();
-  const calendarMap = new Map(calendar.map(entry => [entry.d, entry.date]));
+  return historical90DaysCache;
+}
 
-  // Transform wide format to long format
-  const historicalSales: HistoricalSale[] = [];
-  
-  // Get all d_ columns
-  Object.keys(itemRow).forEach(key => {
-    if (key.startsWith('d_')) {
-      const date = calendarMap.get(key);
-      if (date) {
-        const salesValue = parseFloat(itemRow[key]) || 0;
-        historicalSales.push({
-          id: itemRow.id || itemId,
-          date,
-          sales: salesValue,
-        });
-      }
+export async function loadHistoricalMonthly() {
+  if (historicalMonthlyCache) return historicalMonthlyCache;
+
+  historicalMonthlyCache = await loadCSV<{
+    id: string;
+    year: number;
+    month: number;
+    sales: number;
+  }>('/historical_monthly.csv');
+
+  return historicalMonthlyCache;
+}
+
+/* =======================
+   HELPERS
+======================= */
+function getBaseItemId(fullId: string): string {
+  // FOODS_1_019_CA_1_evaluation → FOODS_1_019
+  return fullId.trim().split('_').slice(0, 3).join('_');
+}
+
+/* =======================
+   UI DATA FUNCTIONS
+======================= */
+export async function getLast90DaysSales(itemId: string): Promise<SalesDataPoint[]> {
+  const data = await loadHistorical90Days();
+  // BUG FIX: Extract base item ID from input (handles both full ID and base ID)
+  // Input could be "FOODS_1_019_CA_1_evaluation" or "FOODS_1_019"
+  // We need to compare base IDs, so extract base from input first
+  const base = getBaseItemId(itemId.trim());
+
+  const dateMap = new Map<string, number>();
+
+  data.forEach((row) => {
+    if (getBaseItemId(row.id) === base) {
+      // Ensure sales is parsed as number (CSV parsing may return string or number)
+      const salesValue = typeof row.sales === 'number' ? row.sales : Number(row.sales) || 0;
+      dateMap.set(row.date, (dateMap.get(row.date) || 0) + salesValue);
     }
   });
 
-  // Sort by date
-  historicalSales.sort((a, b) => a.date.localeCompare(b.date));
-  
-  // Cache the result
-  salesCache.set(itemId, historicalSales);
-  
-  return historicalSales;
+  return Array.from(dateMap.entries())
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .map(([date, sales]) => ({ date, sales }));
 }
 
-/**
- * Get last 90 days of sales for an item
- */
-export async function getLast90DaysSales(itemId: string): Promise<SalesDataPoint[]> {
-  const sales = await loadHistoricalSalesForItem(itemId);
-  
-  // Sort by date descending and take last 90 days
-  const sorted = [...sales].sort((a, b) => b.date.localeCompare(a.date));
-  const last90 = sorted.slice(0, 90).reverse();
-  
-  return last90.map(s => ({
-    date: s.date,
-    sales: s.sales,
-  }));
-}
+export async function getYearlySalesData(itemId: string, year: number) {
+  const data = await loadHistoricalMonthly();
+  // BUG FIX: Extract base item ID from input (handles both full ID and base ID)
+  // Input could be "FOODS_1_019_CA_1_evaluation" or "FOODS_1_019"
+  // We need to compare base IDs, so extract base from input first
+  const base = getBaseItemId(itemId.trim());
 
-/**
- * Get sales data for a specific year (monthly aggregation)
- */
-export async function getYearlySalesData(itemId: string, year: number): Promise<{ month: string; sales: number }[]> {
-  const sales = await loadHistoricalSalesForItem(itemId);
-  
-  // Filter by year
-  const yearData = sales.filter(s => {
-    const saleYear = new Date(s.date).getFullYear();
-    return saleYear === year;
+  const monthMap = new Map<number, number>();
+
+  data.forEach((row) => {
+    // BUG FIX: Ensure numeric comparison for year (CSV may have floats like 2011.0)
+    const rowYear = typeof row.year === 'number' ? Math.floor(row.year) : Number(row.year);
+    const rowMonth = typeof row.month === 'number' ? Math.floor(row.month) : Number(row.month);
+    
+    if (rowYear === year && getBaseItemId(row.id) === base) {
+      monthMap.set(rowMonth, (monthMap.get(rowMonth) || 0) + Number(row.sales));
+    }
   });
-  
-  // Aggregate by month
-  const monthlyMap = new Map<string, number>();
-  
-  yearData.forEach(sale => {
-    const month = new Date(sale.date).toLocaleString('default', { month: 'short' });
-    const current = monthlyMap.get(month) || 0;
-    monthlyMap.set(month, current + sale.sales);
-  });
-  
-  // Convert to array and sort by month order
-  const monthOrder = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  return monthOrder
-    .filter(month => monthlyMap.has(month))
-    .map(month => ({
-      month,
-      sales: monthlyMap.get(month) || 0,
+
+  return Array.from(monthMap.entries())
+    .sort((a, b) => a[0] - b[0])
+    .map(([month, sales]) => ({
+      month: new Date(2000, month - 1).toLocaleString('default', { month: 'short' }),
+      sales,
     }));
 }
 
-/**
- * Get forecast data for an item
- */
-export async function getForecastForItem(itemId: string): Promise<{ day: number; forecast: number; date: string }[]> {
+/* =======================
+   FORECAST (UNCHANGED)
+======================= */
+export async function getForecastForItem(itemId: string) {
   const forecasts = await loadForecasts();
   const calendar = await loadCalendar();
-  
-  // Find forecast for this item - try exact match first, then partial match
-  let itemForecast = forecasts.find(f => f.id === itemId);
-  if (!itemForecast) {
-    // Try to find by matching the base item_id pattern
-    // itemId might be the full id or just the item_id part
-    itemForecast = forecasts.find(f => {
-      // Extract base pattern from itemId (remove _validation/_evaluation if present)
-      const baseId = itemId.replace(/_(validation|evaluation)$/, '');
-      const forecastBaseId = f.id.replace(/_(validation|evaluation)$/, '');
-      return forecastBaseId === baseId || f.id.includes(itemId) || itemId.includes(f.id);
-    });
-  }
-  
-  if (!itemForecast) {
-    return [];
-  }
-  
-  // Get the last date from calendar to calculate forecast dates
-  const sortedCalendar = [...calendar].sort((a, b) => b.date.localeCompare(a.date));
-  const lastDate = sortedCalendar[0]?.date || '2016-05-22';
-  const lastDateObj = new Date(lastDate);
-  
-  // Generate forecast dates (next 28 days)
-  const forecastData: { day: number; forecast: number; date: string }[] = [];
-  
-  for (let i = 1; i <= 28; i++) {
-    const forecastDate = new Date(lastDateObj);
-    forecastDate.setDate(forecastDate.getDate() + i);
-    
-    const dayKey = `F${i}` as keyof Forecast;
-    const forecastValue = itemForecast[dayKey];
-    if (forecastValue !== undefined && forecastValue !== null) {
-      forecastData.push({
-        day: i,
-        forecast: parseFloat(forecastValue as string) || 0,
-        date: forecastDate.toISOString().split('T')[0],
-      });
-    }
-  }
-  
-  return forecastData;
+
+  const forecast =
+    forecasts.find((f) => f.id === itemId) ||
+    forecasts.find(
+      (f) =>
+        getBaseItemId(f.id) === getBaseItemId(itemId)
+    );
+
+  if (!forecast) return [];
+
+  const lastDate = calendar.map((c) => c.date).sort().pop()!;
+  const baseDate = new Date(lastDate);
+
+  return Array.from({ length: 28 }, (_, i) => {
+    const date = new Date(baseDate);
+    date.setDate(date.getDate() + i + 1);
+
+    return {
+      day: i + 1,
+      forecast: Number(forecast[`F${i + 1}` as keyof Forecast]),
+      date: date.toISOString().split('T')[0],
+    };
+  });
 }
 
-/**
- * Get filtered items based on filter criteria
- */
+/* =======================
+   FILTERS
+======================= */
 export async function getFilteredItems(filters: {
   state?: string;
   store?: string;
   category?: string;
   department?: string;
   item?: string;
-}): Promise<ItemMaster[]> {
+}) {
   const items = await loadItemMaster();
-  
-  return items.filter(item => {
-    if (filters.state && item.state_id !== filters.state) return false;
-    if (filters.store && item.store_id !== filters.store) return false;
-    if (filters.category && item.cat_id !== filters.category) return false;
-    if (filters.department && item.dept_id !== filters.department) return false;
-    if (filters.item && item.item_id !== filters.item) return false;
+
+  return items.filter((i) => {
+    if (filters.state && i.state_id !== filters.state) return false;
+    if (filters.store && i.store_id !== filters.store) return false;
+    if (filters.category && i.cat_id !== filters.category) return false;
+    if (filters.department && i.dept_id !== filters.department) return false;
+    if (filters.item && i.item_id !== filters.item) return false;
     return true;
   });
 }
-

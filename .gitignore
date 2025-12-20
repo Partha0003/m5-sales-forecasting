@@ -1,17 +1,26 @@
+############################
+# FRONTEND / NEXT.JS
+############################
+
 # dependencies
 /node_modules
 /.pnp
 .pnp.js
 
+# next.js
+/.next/
+ /out/
+ /build/
+
 # testing
 /coverage
 
-# next.js
-/.next/
-/out/
+# env
+.env*
+.env*.local
 
-# production
-/build
+# vercel
+.vercel
 
 # misc
 .DS_Store
@@ -22,12 +31,35 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# local env files
-.env*.local
-
-# vercel
-.vercel
-
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+############################
+# DATA / ML (VERY IMPORTANT)
+############################
+
+# datasets
+*.csv
+*.parquet
+*.jsonl
+
+# ML artifacts
+*.pkl
+*.joblib
+*.h5
+*.pt
+*.ckpt
+*.txt
+
+# outputs
+submission.csv
+processed_dataset.pkl
+
+############################
+# PYTHON / NOTEBOOKS
+############################
+
+__pycache__/
+.ipynb_checkpoints/
+*.pyc
