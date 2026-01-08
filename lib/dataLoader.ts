@@ -152,31 +152,40 @@ export async function getYearlySalesData(itemId: string, year: number) {
 }
 
 /* =======================
-   FORECAST (UNCHANGED)
+   FORECAST (AGGREGATED ACROSS ALL STORES)
 ======================= */
 export async function getForecastForItem(itemId: string) {
   const forecasts = await loadForecasts();
   const calendar = await loadCalendar();
 
-  const forecast =
-    forecasts.find((f) => f.id === itemId) ||
-    forecasts.find(
-      (f) =>
-        getBaseItemId(f.id) === getBaseItemId(itemId)
-    );
+  // Extract base item ID to find all matching stores
+  const baseItemId = getBaseItemId(itemId);
+  
+  // Find ALL forecast rows that match the base item_id (across all stores/states)
+  const matchingForecasts = forecasts.filter(
+    (f) => getBaseItemId(f.id) === baseItemId
+  );
 
-  if (!forecast) return [];
+  if (matchingForecasts.length === 0) return [];
 
   const lastDate = calendar.map((c) => c.date).sort().pop()!;
   const baseDate = new Date(lastDate);
 
+  // Aggregate forecast values (F1-F28) across all matching stores
   return Array.from({ length: 28 }, (_, i) => {
     const date = new Date(baseDate);
     date.setDate(date.getDate() + i + 1);
+    
+    const dayKey = `F${i + 1}` as keyof Forecast;
+    // Sum forecast values across all stores for this day
+    const aggregatedForecast = matchingForecasts.reduce(
+      (sum, f) => sum + Number(f[dayKey] || 0),
+      0
+    );
 
     return {
       day: i + 1,
-      forecast: Number(forecast[`F${i + 1}` as keyof Forecast]),
+      forecast: aggregatedForecast,
       date: date.toISOString().split('T')[0],
     };
   });

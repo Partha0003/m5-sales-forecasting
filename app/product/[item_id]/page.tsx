@@ -118,7 +118,7 @@ export default function ProductDetailPage() {
     );
   }
 
-  // Calculate KPIs
+  // Calculate KPIs (All Stores aggregation)
   const totalSales = recentSales.reduce((sum, sale) => sum + sale.sales, 0);
   const avgDailySales = recentSales.length > 0 ? totalSales / recentSales.length : 0;
   const forecastTotal = forecast.reduce((sum, f) => sum + f.forecast, 0);
@@ -127,9 +127,14 @@ export default function ProductDetailPage() {
   const last28Avg = last28Days.length > 0 
     ? last28Days.reduce((sum, s) => sum + s.sales, 0) / last28Days.length 
     : 0;
-  const forecastGrowth = last28Avg > 0 
+  
+  // Calculate forecast growth with safety guard to prevent extreme values
+  let forecastGrowth = last28Avg > 0 
     ? ((forecastAvg - last28Avg) / last28Avg) * 100 
     : 0;
+  
+  // Clamp extreme growth values to prevent misleading KPIs
+  forecastGrowth = Math.max(-200, Math.min(200, forecastGrowth));
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -151,6 +156,24 @@ export default function ProductDetailPage() {
         {/* Product Summary */}
         <div className="bg-white rounded-lg shadow-md p-6 border border-gray-200">
           <h2 className="text-xl font-bold text-gray-900 mb-4">Product Summary</h2>
+          <div className="mb-4 p-3 bg-blue-50 border-l-4 border-primary-500 rounded-r">
+            <div className="flex items-center gap-2">
+              <p className="text-sm font-semibold text-gray-900">Scope: All Stores</p>
+              <div className="group relative">
+                <svg 
+                  className="w-4 h-4 text-gray-500 cursor-help" 
+                  fill="none" 
+                  stroke="currentColor" 
+                  viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 w-64 p-2 bg-gray-800 text-white text-xs rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                  All metrics, forecasts, and insights are aggregated across all stores and states where this product is sold. Historical sales and forecasts are summed to provide a complete view.
+                </div>
+              </div>
+            </div>
+          </div>
           <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
             <div>
               <p className="text-sm text-gray-600">Item ID</p>
@@ -196,7 +219,7 @@ export default function ProductDetailPage() {
         {/* Recent Performance */}
         <RecentPerformanceChart 
           data={recentSales} 
-          title="Recent Performance (Last 90 Days)"
+          title="Recent Performance (Last 90 Days - All Stores)"
         />
 
         {/* Historical Analysis */}
@@ -218,7 +241,7 @@ export default function ProductDetailPage() {
               <p className="text-gray-600">Loading yearly data...</p>
             </div>
           ) : yearlySales.length > 0 ? (
-            <MonthlySalesChart data={yearlySales} year={selectedYear} />
+            <MonthlySalesChart data={yearlySales} year={selectedYear} title={`Monthly Sales (All Stores) - ${selectedYear}`} />
           ) : (
             <div className="h-96 flex items-center justify-center">
               <p className="text-gray-600">No data available for selected year</p>
