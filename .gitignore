@@ -1,65 +1,64 @@
 ############################
-# FRONTEND / NEXT.JS
+# NODE / NEXT.JS
 ############################
 
-# dependencies
-/node_modules
-/.pnp
+node_modules/
+.pnp
 .pnp.js
 
-# next.js
-/.next/
- /out/
- /build/
+.next/
+out/
+build/
+coverage/
 
-# testing
-/coverage
+.vercel/
 
-# env
-.env*
-.env*.local
+############################
+# ENVIRONMENT FILES (SECRETS)
+############################
 
-# vercel
-.vercel
+.env
+.env.local
+.env.*.local
 
-# misc
-.DS_Store
-*.pem
+############################
+# LOGS & SYSTEM FILES
+############################
 
-# debug
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+.DS_Store
 
-# typescript
+############################
+# TYPESCRIPT / BUILD CACHE
+############################
+
 *.tsbuildinfo
-next-env.d.ts
 
 ############################
-# DATA / ML (VERY IMPORTANT)
-############################
-
-# datasets
-*.csv
-*.parquet
-*.jsonl
-
-# ML artifacts
-*.pkl
-*.joblib
-*.h5
-*.pt
-*.ckpt
-*.txt
-
-# outputs
-submission.csv
-processed_dataset.pkl
-
-############################
-# PYTHON / NOTEBOOKS
+# PYTHON
 ############################
 
 __pycache__/
 .ipynb_checkpoints/
 *.pyc
+
+############################
+# ML MODEL ARTIFACTS (NOT SOURCE DATA)
+############################
+
+models/
+checkpoints/
+*.pkl
+*.joblib
+*.h5
+*.pt
+*.ckpt
+
+############################
+# OPTIONAL: LARGE GENERATED OUTPUTS
+############################
+
+outputs/
+predictions/
