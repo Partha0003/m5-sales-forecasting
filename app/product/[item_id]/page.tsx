@@ -87,7 +87,23 @@ export default function ProductDetailPage() {
   // Generate insights whenever data changes
   useEffect(() => {
     if (recentSales.length > 0 || forecast.length > 0) {
-      const newInsights = generateInsights(recentSales, forecast, yearlySales.length > 0 ? yearlySales : undefined);
+      const recentAvg = recentSales.length >= 28 
+        ? recentSales.slice(-28).reduce((sum, s) => sum + s.sales, 0) / 28
+        : recentSales.length > 0
+        ? recentSales.reduce((sum, s) => sum + s.sales, 0) / recentSales.length
+        : 0;
+      const forecastAvg = forecast.length > 0
+        ? forecast.reduce((sum, f) => sum + f.forecast, 0) / forecast.length
+        : 0;
+      const absoluteChange = forecastAvg - recentAvg;
+      
+      const newInsights = generateInsights(
+        recentSales, 
+        forecast, 
+        yearlySales.length > 0 ? yearlySales : undefined,
+        absoluteChange,
+        recentAvg
+      );
       setInsights(newInsights);
     }
   }, [recentSales, forecast, yearlySales]);
@@ -122,19 +138,22 @@ export default function ProductDetailPage() {
   const totalSales = recentSales.reduce((sum, sale) => sum + sale.sales, 0);
   const avgDailySales = recentSales.length > 0 ? totalSales / recentSales.length : 0;
   const forecastTotal = forecast.reduce((sum, f) => sum + f.forecast, 0);
-  const forecastAvg = forecast.length > 0 ? forecastTotal / forecast.length : 0;
+  const forecastAvgDaily = forecast.length > 0 ? forecastTotal / forecast.length : 0;
   const last28Days = recentSales.slice(-28);
-  const last28Avg = last28Days.length > 0 
+  const recentAvgDaily = last28Days.length > 0 
     ? last28Days.reduce((sum, s) => sum + s.sales, 0) / last28Days.length 
     : 0;
   
-  // Calculate forecast growth with safety guard to prevent extreme values
-  let forecastGrowth = last28Avg > 0 
-    ? ((forecastAvg - last28Avg) / last28Avg) * 100 
-    : 0;
+  // Calculate absolute demand change (units/day)
+  const absoluteDemandChange = forecastAvgDaily - recentAvgDaily;
   
-  // Clamp extreme growth values to prevent misleading KPIs
-  forecastGrowth = Math.max(-200, Math.min(200, forecastGrowth));
+  // Determine trend for arrow display
+  const demandChangeTrend = absoluteDemandChange > 0.01 ? 'up' 
+    : absoluteDemandChange < -0.01 ? 'down' 
+    : 'neutral';
+  
+  // Check if low-volume item for safety note
+  const isLowVolume = recentAvgDaily < 1;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -209,10 +228,10 @@ export default function ProductDetailPage() {
             value={avgDailySales.toLocaleString(undefined, { maximumFractionDigits: 2 })}
           />
           <KPICard
-            title="Forecasted Growth"
-            value={`${forecastGrowth >= 0 ? '+' : ''}${forecastGrowth.toFixed(1)}%`}
-            subtitle="Next 28 days vs recent"
-            trend={forecastGrowth > 0 ? 'up' : forecastGrowth < 0 ? 'down' : 'neutral'}
+            title="Expected Demand Change"
+            value={`${absoluteDemandChange >= 0 ? '+' : ''}${absoluteDemandChange.toFixed(2)} units/day`}
+            subtitle="Next 28 days vs recent period"
+            trend={demandChangeTrend}
           />
         </div>
 
@@ -260,6 +279,13 @@ export default function ProductDetailPage() {
         {/* Business Insights */}
         <div className="bg-white rounded-lg shadow-md p-6 border border-gray-200">
           <h2 className="text-xl font-bold text-gray-900 mb-4">Business Insights</h2>
+          {isLowVolume && (
+            <div className="mb-4 p-3 bg-yellow-50 border-l-4 border-yellow-500 rounded-r">
+              <p className="text-sm text-gray-700">
+                <strong>Note:</strong> This is a low-volume item; absolute demand changes are more meaningful than percentage growth.
+              </p>
+            </div>
+          )}
           <div className="space-y-3">
             {insights.map((insight, index) => (
               <div 

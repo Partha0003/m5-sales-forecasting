@@ -96,28 +96,36 @@ export default function Dashboard() {
       return {
         totalSales: 0,
         avgDailySales: 0,
-        forecastGrowth: 0,
+        absoluteDemandChange: 0,
+        demandChangeTrend: 'neutral' as const,
       };
     }
 
     const totalSales = recentSales.reduce((sum, sale) => sum + sale.sales, 0);
     const avgDailySales = totalSales / recentSales.length;
 
-    // Calculate forecast growth: compare next 28 days forecast vs last 28 days actual
+    // Calculate absolute demand change: compare next 28 days forecast vs last 28 days actual
     const last28Days = recentSales.slice(-28);
-    const last28DaysAvg = last28Days.reduce((sum, sale) => sum + sale.sales, 0) / last28Days.length;
-    const forecastAvg = forecast.length > 0 
+    const recentAvgDaily = last28Days.length > 0
+      ? last28Days.reduce((sum, sale) => sum + sale.sales, 0) / last28Days.length
+      : 0;
+    const forecastAvgDaily = forecast.length > 0 
       ? forecast.reduce((sum, f) => sum + f.forecast, 0) / forecast.length
       : 0;
     
-    const forecastGrowth = last28DaysAvg > 0 
-      ? ((forecastAvg - last28DaysAvg) / last28DaysAvg) * 100
-      : 0;
+    // Calculate absolute demand change (units/day)
+    const absoluteDemandChange = forecastAvgDaily - recentAvgDaily;
+    
+    // Determine trend for arrow display
+    const demandChangeTrend = absoluteDemandChange > 0.01 ? 'up' 
+      : absoluteDemandChange < -0.01 ? 'down' 
+      : 'neutral';
 
     return {
       totalSales,
       avgDailySales,
-      forecastGrowth,
+      absoluteDemandChange,
+      demandChangeTrend,
     };
   }, [recentSales, forecast]);
 
@@ -184,10 +192,10 @@ export default function Dashboard() {
                 subtitle="Last 90 days average"
               />
               <KPICard
-                title="Forecasted Growth"
-                value={`${kpis.forecastGrowth >= 0 ? '+' : ''}${kpis.forecastGrowth.toFixed(1)}%`}
+                title="Expected Demand Change"
+                value={`${kpis.absoluteDemandChange >= 0 ? '+' : ''}${kpis.absoluteDemandChange.toFixed(2)} units/day`}
                 subtitle="Next 28 days vs recent period"
-                trend={kpis.forecastGrowth > 0 ? 'up' : kpis.forecastGrowth < 0 ? 'down' : 'neutral'}
+                trend={kpis.demandChangeTrend}
               />
             </div>
 

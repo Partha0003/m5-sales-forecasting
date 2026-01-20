@@ -7,7 +7,9 @@ import { SalesDataPoint, ForecastDataPoint } from './types';
 export function generateInsights(
   recentSales: SalesDataPoint[],
   forecast: ForecastDataPoint[],
-  yearlyData?: { month: string; sales: number }[]
+  yearlyData?: { month: string; sales: number }[],
+  absoluteChange?: number,
+  recentAvgDaily?: number
 ): string[] {
   const insights: string[] = [];
 
@@ -15,34 +17,26 @@ export function generateInsights(
     return ['No data available for insights'];
   }
 
-  // Calculate forecast growth (All Stores aggregation)
-  if (recentSales.length >= 28 && forecast.length > 0) {
+  // Calculate absolute demand change if not provided
+  let calculatedAbsoluteChange = absoluteChange;
+  if (calculatedAbsoluteChange === undefined && recentSales.length >= 28 && forecast.length > 0) {
     const last28Days = recentSales.slice(-28);
     const last28Avg = last28Days.reduce((sum, s) => sum + s.sales, 0) / last28Days.length;
     const forecastAvg = forecast.reduce((sum, f) => sum + f.forecast, 0) / forecast.length;
+    calculatedAbsoluteChange = forecastAvg - last28Avg;
+  }
 
-    if (last28Avg > 0) {
-      let growthPercent = ((forecastAvg - last28Avg) / last28Avg) * 100;
-      
-      // Safety guard: Clamp extreme values to prevent misleading insights
-      const clampedGrowth = Math.max(-200, Math.min(200, growthPercent));
-      
-      // Only use clamped value if original was extreme (indicates potential data issue)
-      const isExtreme = Math.abs(growthPercent) > 200;
-      const displayGrowth = isExtreme ? clampedGrowth : growthPercent;
-      
-      if (displayGrowth > 5) {
-        insights.push(`Sales across all stores are projected to increase by ${displayGrowth.toFixed(1)}% over the next 28 days, indicating positive growth potential.`);
-      } else if (displayGrowth < -5) {
-        insights.push(`Sales across all stores are projected to decrease by ${Math.abs(displayGrowth).toFixed(1)}% over the next 28 days, suggesting a potential decline in demand.`);
-      } else {
-        insights.push(`Sales across all stores are projected to remain relatively stable over the next 28 days with a ${displayGrowth >= 0 ? '+' : ''}${displayGrowth.toFixed(1)}% change.`);
-      }
-      
-      // Add note if extreme values were clamped
-      if (isExtreme) {
-        insights.push(`Note: Growth calculation was adjusted due to significant variance. Please review data quality.`);
-      }
+  // Generate forecast change insight using absolute change
+  if (calculatedAbsoluteChange !== undefined && forecast.length > 0) {
+    const absChange = Math.abs(calculatedAbsoluteChange);
+    
+    // Threshold for "significant" change: 0.5 units/day
+    if (calculatedAbsoluteChange > 0.5) {
+      insights.push(`Demand is expected to increase by approximately ${absChange.toFixed(2)} units per day over the next 28 days.`);
+    } else if (calculatedAbsoluteChange < -0.5) {
+      insights.push(`Demand is expected to slightly soften by approximately ${absChange.toFixed(2)} units per day compared to the recent period.`);
+    } else {
+      insights.push(`Demand is expected to remain stable over the next 28 days.`);
     }
   }
 
@@ -55,13 +49,11 @@ export function generateInsights(
     const secondAvg = secondHalf.reduce((sum, s) => sum + s.sales, 0) / secondHalf.length;
 
     if (firstAvg > 0) {
-      const trendPercent = ((secondAvg - firstAvg) / firstAvg) * 100;
-      // Clamp extreme trend values
-      const clampedTrend = Math.max(-200, Math.min(200, trendPercent));
-      
-      if (clampedTrend > 10) {
+      const trendChange = secondAvg - firstAvg;
+      // Use absolute change threshold: 0.5 units/day for significant trend
+      if (trendChange > 0.5) {
         insights.push('Recent trend across all stores shows increasing demand, indicating positive momentum.');
-      } else if (clampedTrend < -10) {
+      } else if (trendChange < -0.5) {
         insights.push('Recent trend across all stores shows decreasing demand, indicating a downward trajectory.');
       } else {
         insights.push('Recent trend across all stores shows stable demand with consistent performance.');
