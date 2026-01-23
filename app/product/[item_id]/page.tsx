@@ -1,16 +1,16 @@
 'use client';
-
+import ModelPerformanceCard from '@/components/ModelPerformanceCard';
 import React, { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import KPICard from '@/components/KPICard';
 import RecentPerformanceChart from '@/components/RecentPerformanceChart';
 import ForecastChart from '@/components/ForecastChart';
 import MonthlySalesChart from '@/components/MonthlySalesChart';
-import { 
-  loadItemMaster, 
-  getLast90DaysSales, 
+import {
+  loadItemMaster,
+  getLast90DaysSales,
   getForecastForItem,
-  getYearlySalesData 
+  getYearlySalesData
 } from '@/lib/dataLoader';
 import { generateInsights } from '@/lib/insights';
 import { ItemMaster, SalesDataPoint, ForecastDataPoint } from '@/lib/types';
@@ -40,10 +40,10 @@ export default function ProductDetailPage() {
         const items = await loadItemMaster();
         // Find item by item_id (could be in different stores/states)
         const foundItem = items.find(item => item.item_id === itemId);
-        
+
         if (foundItem) {
           setItemMaster(foundItem);
-          
+
           // Load sales and forecast data
           const [salesData, forecastData] = await Promise.all([
             getLast90DaysSales(foundItem.id),
@@ -87,19 +87,19 @@ export default function ProductDetailPage() {
   // Generate insights whenever data changes
   useEffect(() => {
     if (recentSales.length > 0 || forecast.length > 0) {
-      const recentAvg = recentSales.length >= 28 
+      const recentAvg = recentSales.length >= 28
         ? recentSales.slice(-28).reduce((sum, s) => sum + s.sales, 0) / 28
         : recentSales.length > 0
-        ? recentSales.reduce((sum, s) => sum + s.sales, 0) / recentSales.length
-        : 0;
+          ? recentSales.reduce((sum, s) => sum + s.sales, 0) / recentSales.length
+          : 0;
       const forecastAvg = forecast.length > 0
         ? forecast.reduce((sum, f) => sum + f.forecast, 0) / forecast.length
         : 0;
       const absoluteChange = forecastAvg - recentAvg;
-      
+
       const newInsights = generateInsights(
-        recentSales, 
-        forecast, 
+        recentSales,
+        forecast,
         yearlySales.length > 0 ? yearlySales : undefined,
         absoluteChange,
         recentAvg
@@ -140,18 +140,18 @@ export default function ProductDetailPage() {
   const forecastTotal = forecast.reduce((sum, f) => sum + f.forecast, 0);
   const forecastAvgDaily = forecast.length > 0 ? forecastTotal / forecast.length : 0;
   const last28Days = recentSales.slice(-28);
-  const recentAvgDaily = last28Days.length > 0 
-    ? last28Days.reduce((sum, s) => sum + s.sales, 0) / last28Days.length 
+  const recentAvgDaily = last28Days.length > 0
+    ? last28Days.reduce((sum, s) => sum + s.sales, 0) / last28Days.length
     : 0;
-  
+
   // Calculate absolute demand change (units/day)
   const absoluteDemandChange = forecastAvgDaily - recentAvgDaily;
-  
+
   // Determine trend for arrow display
-  const demandChangeTrend = absoluteDemandChange > 0.01 ? 'up' 
-    : absoluteDemandChange < -0.01 ? 'down' 
-    : 'neutral';
-  
+  const demandChangeTrend = absoluteDemandChange > 0.01 ? 'up'
+    : absoluteDemandChange < -0.01 ? 'down'
+      : 'neutral';
+
   // Check if low-volume item for safety note
   const isLowVolume = recentAvgDaily < 1;
 
@@ -179,10 +179,10 @@ export default function ProductDetailPage() {
             <div className="flex items-center gap-2">
               <p className="text-sm font-semibold text-gray-900">Scope: All Stores</p>
               <div className="group relative">
-                <svg 
-                  className="w-4 h-4 text-gray-500 cursor-help" 
-                  fill="none" 
-                  stroke="currentColor" 
+                <svg
+                  className="w-4 h-4 text-gray-500 cursor-help"
+                  fill="none"
+                  stroke="currentColor"
                   viewBox="0 0 24 24"
                 >
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -235,9 +235,18 @@ export default function ProductDetailPage() {
           />
         </div>
 
+        {/* Model Performance */}
+        <div className="mt-6">
+          <h2 className="text-sm font-semibold text-gray-700 mb-2">
+            Model Evaluation Summary
+          </h2>
+          <ModelPerformanceCard />
+        </div>
+
+        
         {/* Recent Performance */}
-        <RecentPerformanceChart 
-          data={recentSales} 
+        <RecentPerformanceChart
+          data={recentSales}
           title="Recent Performance (Last 90 Days - All Stores)"
         />
 
@@ -270,8 +279,8 @@ export default function ProductDetailPage() {
 
         {/* Forecast Analysis */}
         {forecast.length > 0 && (
-          <ForecastChart 
-            data={forecast} 
+          <ForecastChart
+            data={forecast}
             title="28-Day Forecast Analysis"
           />
         )}
@@ -288,7 +297,7 @@ export default function ProductDetailPage() {
           )}
           <div className="space-y-3">
             {insights.map((insight, index) => (
-              <div 
+              <div
                 key={index}
                 className="p-4 bg-blue-50 border-l-4 border-primary-500 rounded-r"
               >

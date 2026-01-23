@@ -71,5 +71,7 @@ export interface ForecastDataPoint {
   day: number;
   forecast: number;
   date: string;
+  lower_bound?: number;
+  upper_bound?: number;
 }
 
