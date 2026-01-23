@@ -22,6 +22,9 @@ const config: Config = {
           900: '#0c4a6e',
         },
       },
+      fontSize: {
+        'base': '1.125rem', // 18px base
+      },
     },
   },
   plugins: [],

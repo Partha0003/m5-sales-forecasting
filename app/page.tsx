@@ -1,18 +1,10 @@
 'use client';
 
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import FilterSidebar from '@/components/FilterSidebar';
-import KPICard from '@/components/KPICard';
-import RecentPerformanceChart from '@/components/RecentPerformanceChart';
-import ForecastChart from '@/components/ForecastChart';
-import { FilterState, SalesDataPoint, ForecastDataPoint, ItemMaster } from '@/lib/types';
-import { 
-  getFilteredItems, 
-  getLast90DaysSales, 
-  getForecastForItem,
-  loadItemMaster 
-} from '@/lib/dataLoader';
+import { FilterState, ItemMaster } from '@/lib/types';
+import { getFilteredItems } from '@/lib/dataLoader';
 
 export default function Dashboard() {
   const router = useRouter();
@@ -25,11 +17,7 @@ export default function Dashboard() {
   });
 
   const [filteredItems, setFilteredItems] = useState<ItemMaster[]>([]);
-  const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
-  const [recentSales, setRecentSales] = useState<SalesDataPoint[]>([]);
-  const [forecast, setForecast] = useState<ForecastDataPoint[]>([]);
   const [loading, setLoading] = useState(true);
-  const [salesLoading, setSalesLoading] = useState(false);
 
   // Load filtered items when filters change
   useEffect(() => {
@@ -44,18 +32,6 @@ export default function Dashboard() {
           item: filters.item || undefined,
         });
         setFilteredItems(items);
-
-        // If a specific item is selected, use it; otherwise use first item
-        if (items.length > 0) {
-          const itemToUse = filters.item 
-            ? items.find(item => item.item_id === filters.item) || items[0]
-            : items[0];
-          
-          if (itemToUse) {
-            // Use the full id from the item
-            setSelectedItemId(itemToUse.id);
-          }
-        }
       } catch (error) {
         console.error('Error loading items:', error);
       } finally {
@@ -66,69 +42,6 @@ export default function Dashboard() {
     loadItems();
   }, [filters]);
 
-  // Load sales and forecast data when selected item changes
-  useEffect(() => {
-    const loadItemData = async () => {
-      if (!selectedItemId) return;
-
-      setSalesLoading(true);
-      try {
-        const [salesData, forecastData] = await Promise.all([
-          getLast90DaysSales(selectedItemId),
-          getForecastForItem(selectedItemId),
-        ]);
-
-        setRecentSales(salesData);
-        setForecast(forecastData);
-      } catch (error) {
-        console.error('Error loading item data:', error);
-      } finally {
-        setSalesLoading(false);
-      }
-    };
-
-    loadItemData();
-  }, [selectedItemId]);
-
-  // Calculate KPIs
-  const kpis = useMemo(() => {
-    if (recentSales.length === 0) {
-      return {
-        totalSales: 0,
-        avgDailySales: 0,
-        absoluteDemandChange: 0,
-        demandChangeTrend: 'neutral' as const,
-      };
-    }
-
-    const totalSales = recentSales.reduce((sum, sale) => sum + sale.sales, 0);
-    const avgDailySales = totalSales / recentSales.length;
-
-    // Calculate absolute demand change: compare next 28 days forecast vs last 28 days actual
-    const last28Days = recentSales.slice(-28);
-    const recentAvgDaily = last28Days.length > 0
-      ? last28Days.reduce((sum, sale) => sum + sale.sales, 0) / last28Days.length
-      : 0;
-    const forecastAvgDaily = forecast.length > 0 
-      ? forecast.reduce((sum, f) => sum + f.forecast, 0) / forecast.length
-      : 0;
-    
-    // Calculate absolute demand change (units/day)
-    const absoluteDemandChange = forecastAvgDaily - recentAvgDaily;
-    
-    // Determine trend for arrow display
-    const demandChangeTrend = absoluteDemandChange > 0.01 ? 'up' 
-      : absoluteDemandChange < -0.01 ? 'down' 
-      : 'neutral';
-
-    return {
-      totalSales,
-      avgDailySales,
-      absoluteDemandChange,
-      demandChangeTrend,
-    };
-  }, [recentSales, forecast]);
-
   const handleItemClick = (item: ItemMaster) => {
     // Navigate using item_id, which is more user-friendly
     router.push(`/product/${item.item_id}`);
@@ -136,88 +49,106 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white shadow-sm border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <h1 className="text-2xl font-bold text-gray-900">Retail Sales Analytics Dashboard</h1>
-          <p className="text-sm text-gray-600 mt-1">Sales performance and demand forecasting</p>
+      {/* Professional Header */}
+      <header className="bg-white border-b border-gray-200 shadow-sm">
+        <div className="px-6 lg:px-10 py-8">
+          <div className="flex items-center gap-3 mb-2">
+            <div className="w-12 h-12 bg-primary-600 rounded-lg flex items-center justify-center">
+              <span className="text-white font-bold text-xl">W</span>
+            </div>
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900">
+                Walmart Retail Sales Forecasting & Decision Intelligence
+              </h1>
+              <p className="text-base text-gray-600 mt-1">
+                Machine learning–driven demand forecasting and inventory insights
+              </p>
+            </div>
+          </div>
         </div>
       </header>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-          {/* Sidebar */}
+      {/* Main Content - Full Width */}
+      <div className="px-6 lg:px-10 py-8">
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+          {/* Filters Sidebar */}
           <div className="lg:col-span-1">
             <FilterSidebar filters={filters} onFiltersChange={setFilters} />
-            
-            {/* Items List */}
-            {filteredItems.length > 0 && (
-              <div className="mt-6 bg-white rounded-lg shadow-md p-6 border border-gray-200">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                  Items ({filteredItems.length})
-                </h3>
-                <div className="space-y-2 max-h-96 overflow-y-auto">
-                  {filteredItems.slice(0, 50).map((item) => (
-                    <button
-                      key={item.id}
-                      onClick={() => handleItemClick(item)}
-                      className="w-full text-left px-3 py-2 text-sm rounded-md hover:bg-gray-100 transition-colors border border-gray-200"
-                    >
-                      <div className="font-medium text-gray-900">{item.item_id}</div>
-                      <div className="text-xs text-gray-500">{item.store_id} • {item.cat_id}</div>
-                    </button>
-                  ))}
-                  {filteredItems.length > 50 && (
-                    <p className="text-xs text-gray-500 text-center py-2">
-                      Showing first 50 of {filteredItems.length} items
-                    </p>
-                  )}
-                </div>
-              </div>
-            )}
           </div>
 
-          {/* Main Content */}
-          <div className="lg:col-span-3 space-y-6">
-            {/* KPI Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <KPICard
-                title="Total Historical Sales"
-                value={kpis.totalSales.toLocaleString(undefined, { maximumFractionDigits: 0 })}
-                subtitle="Last 90 days"
-              />
-              <KPICard
-                title="Average Daily Sales"
-                value={kpis.avgDailySales.toLocaleString(undefined, { maximumFractionDigits: 2 })}
-                subtitle="Last 90 days average"
-              />
-              <KPICard
-                title="Expected Demand Change"
-                value={`${kpis.absoluteDemandChange >= 0 ? '+' : ''}${kpis.absoluteDemandChange.toFixed(2)} units/day`}
-                subtitle="Next 28 days vs recent period"
-                trend={kpis.demandChangeTrend}
-              />
-            </div>
+          {/* Product List - Full Width */}
+          <div className="lg:col-span-3">
+            <div className="bg-white rounded-lg shadow-md border border-gray-200">
+              <div className="p-6 border-b border-gray-200">
+                <h2 className="text-2xl font-bold text-gray-900">
+                  Product Selection
+                </h2>
+                <p className="text-sm text-gray-600 mt-1">
+                  Select filters above to browse available products, then click a product to view detailed forecast analysis
+                </p>
+              </div>
 
-            {/* Charts */}
-            {loading || salesLoading ? (
-              <div className="bg-white rounded-lg shadow-md p-12 border border-gray-200 text-center">
-                <p className="text-gray-600">Loading data...</p>
-              </div>
-            ) : recentSales.length > 0 ? (
-              <>
-                <RecentPerformanceChart data={recentSales} />
-                {forecast.length > 0 && <ForecastChart data={forecast} />}
-              </>
-            ) : (
-              <div className="bg-white rounded-lg shadow-md p-12 border border-gray-200 text-center">
-                <p className="text-gray-600">Select filters to view sales data</p>
-              </div>
-            )}
+              {loading ? (
+                <div className="p-12 text-center">
+                  <p className="text-gray-600">Loading products...</p>
+                </div>
+              ) : filteredItems.length > 0 ? (
+                <div className="p-6">
+                  <div className="mb-4 flex items-center justify-between">
+                    <p className="text-sm font-medium text-gray-700">
+                      Found {filteredItems.length} product{filteredItems.length !== 1 ? 's' : ''}
+                    </p>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 max-h-[calc(100vh-300px)] overflow-y-auto">
+                    {filteredItems.slice(0, 100).map((item) => (
+                      <button
+                        key={item.id}
+                        onClick={() => handleItemClick(item)}
+                        className="text-left p-4 rounded-lg border border-gray-200 hover:border-primary-500 hover:shadow-md transition-all bg-white hover:bg-primary-50 group"
+                      >
+                        <div className="font-semibold text-gray-900 group-hover:text-primary-700 transition-colors">
+                          {item.item_id}
+                        </div>
+                        <div className="text-xs text-gray-500 mt-2 space-y-1">
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium">Store:</span>
+                            <span>{item.store_id}</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium">Category:</span>
+                            <span>{item.cat_id}</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium">State:</span>
+                            <span>{item.state_id}</span>
+                          </div>
+                        </div>
+                        <div className="mt-3 text-xs text-primary-600 font-medium opacity-0 group-hover:opacity-100 transition-opacity">
+                          View Forecast Analysis →
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                  {filteredItems.length > 100 && (
+                    <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                      <p className="text-sm text-blue-800">
+                        Showing first 100 of {filteredItems.length} products. Use filters to narrow your search.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="p-12 text-center">
+                  <p className="text-gray-600 mb-2">No products found</p>
+                  <p className="text-sm text-gray-500">
+                    Try adjusting your filters to see more products
+                  </p>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
     </div>
   );
 }
-

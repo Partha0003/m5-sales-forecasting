@@ -24,24 +24,26 @@ export default function ForecastChart({ data, title = '28-Day Forecast' }: Forec
 
   return (
     <div className="bg-white rounded-lg shadow-md p-6 border border-gray-200">
-      <h3 className="text-lg font-semibold text-gray-900 mb-4">{title}</h3>
-      <ResponsiveContainer width="100%" height={400}>
-        <ComposedChart data={chartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+      {title && <h3 className="text-lg font-semibold text-gray-900 mb-4">{title}</h3>}
+      <ResponsiveContainer width="100%" height={450}>
+        <ComposedChart data={chartData} margin={{ top: 10, right: 30, left: 20, bottom: 5 }}>
+          <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" strokeOpacity={0.5} />
           <XAxis 
             dataKey="day" 
-            stroke="#6b7280"
-            tick={{ fontSize: 12 }}
+            stroke="#9ca3af"
+            tick={{ fontSize: 14, fill: '#6b7280' }}
           />
-          <YAxis stroke="#6b7280" tick={{ fontSize: 12 }} />
+          <YAxis stroke="#9ca3af" tick={{ fontSize: 14, fill: '#6b7280' }} />
           <Tooltip 
             contentStyle={{ 
               backgroundColor: 'white', 
               border: '1px solid #e5e7eb',
-              borderRadius: '6px',
-              padding: '8px'
+              borderRadius: '8px',
+              padding: '14px',
+              boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+              fontSize: '14px'
             }}
-            labelStyle={{ color: '#374151', fontWeight: 'bold' }}
+            labelStyle={{ color: '#374151', fontWeight: 'bold', marginBottom: '6px', fontSize: '15px' }}
             formatter={(value: number, name: string) => {
               if (name === 'forecast') {
                 return [value.toFixed(2), 'Forecast'];
@@ -55,7 +57,7 @@ export default function ForecastChart({ data, title = '28-Day Forecast' }: Forec
               return [value.toFixed(2), name];
             }}
           />
-          <Legend />
+          <Legend wrapperStyle={{ paddingTop: '20px', fontSize: '14px' }} />
           {hasConfidenceIntervals && (
             <>
               {/* First: Fill area from dataMin to upper_bound with confidence color */}
@@ -85,8 +87,9 @@ export default function ForecastChart({ data, title = '28-Day Forecast' }: Forec
             type="monotone" 
             dataKey="forecast" 
             stroke="#10b981" 
-            strokeWidth={2}
+            strokeWidth={3}
             dot={false}
+            activeDot={{ r: 5, fill: '#10b981' }}
             name="Forecasted Demand"
           />
         </ComposedChart>

@@ -32,17 +32,17 @@ export default function KPICard({ title, value, subtitle, trend }: KPICardProps)
 
   return (
     <div className="bg-white rounded-lg shadow-md p-6 border border-gray-200">
-      <h3 className="text-sm font-medium text-gray-600 mb-2">{title}</h3>
+      <h3 className="text-base font-medium text-gray-600 mb-2">{title}</h3>
       <div className="flex items-baseline">
-        <p className="text-3xl font-bold text-gray-900">{value}</p>
+        <p className="text-5xl font-bold text-gray-900">{value}</p>
         {trend && (
-          <span className={`ml-2 text-sm font-medium ${getTrendColor()}`}>
+          <span className={`ml-2 text-base font-medium ${getTrendColor()}`}>
             {getTrendIcon()}
           </span>
         )}
       </div>
       {subtitle && (
-        <p className="text-sm text-gray-500 mt-2">{subtitle}</p>
+        <p className="text-base text-gray-500 mt-2">{subtitle}</p>
       )}
     </div>
   );
